@@ -1,6 +1,9 @@
-from fastapi import FastAPI
-from schemas import ChatRequest, ChatResponse
-from database import SessionLocal, engine, Base
+from fastapi import FastAPI,Depends
+from app import crud
+from app.schemas import ChatRequest, ChatResponse
+from app.database import SessionLocal, engine, Base
+from sqlalchemy.orm import Session
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -18,8 +21,21 @@ def get_db():
         db.close()
         
 @app.post("/chat", response_model=ChatResponse)
-def chat(request: ChatRequest):
+def chat(request: ChatRequest, db:Session=Depends(get_db)):
     
+    reply_text= f"Hello {request.user_id}, you said: {request.message}"
+
+    crud.save_chat(
+        db=db,
+        user_id=request.user_id,
+        message=request.message,
+        reply=reply_text
+    )
     return ChatResponse(
         reply=f"Hello {request.user_id}, you said: {request.message}"
     )
+
+@app.get("/history/{user_id}")
+def chat_history(user_id:str, db:Session=Depends(get_db)):
+    history=crud.get_chat_history(db=db, user_id=user_id)
+    return history
