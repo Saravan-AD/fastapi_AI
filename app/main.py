@@ -1,10 +1,11 @@
-from fastapi import FastAPI,Depends
+from fastapi import FastAPI,Depends,UploadFile,File
 from app import crud
 from app.schemas import ChatRequest, ChatResponse
 from app.database import SessionLocal, engine, Base
 from sqlalchemy.orm import Session
-
+import os
 from app.services.ai_service import generate_ai_reply
+from app.services.doc_service import load_all_documents
 
 
 Base.metadata.create_all(bind=engine)
@@ -39,15 +40,44 @@ def chat(request: ChatRequest, db:Session=Depends(get_db)):
 
     ai_reply = generate_ai_reply(messages)
 
-    crud.save_chat(
+    if not ai_reply.startswith("(AI Error)"):
+        crud.save_chat(
         db=db,
         user_id=request.user_id,
         message=request.message,
         reply=ai_reply
-    )
+        )
+
     return ChatResponse(
         reply=ai_reply
     )
+
+DOCS_PATH = "documents"
+os.makedirs(DOCS_PATH, exist_ok=True)
+
+@app.post("/upload-doc")
+def upload_doc(file: UploadFile = File(...)):
+    file_path = os.path.join(DOCS_PATH, file.filename)
+
+    with open(file_path, "wb") as f:
+        f.write(file.file.read())
+
+    return {"message": "File uploaded successfully"}
+
+@app.post("/ask-doc", response_model=ChatResponse)
+def ask_doc(request: ChatRequest):
+
+    documents_text = load_all_documents()
+
+    messages = [
+        {"role": "system", "content": "Answer ONLY using the provided documents. If not found, say you don't know."},
+        {"role": "user", "content": f"DOCUMENTS:\n{documents_text}"},
+        {"role": "user", "content": request.message}
+    ]
+
+    ai_reply = generate_ai_reply(messages)
+
+    return ChatResponse(reply=ai_reply)
 
 @app.get("/history/{user_id}")
 def chat_history(user_id:str, db:Session=Depends(get_db)):

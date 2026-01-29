@@ -1,7 +1,7 @@
 import requests
 import certifi
 
-OPENROUTER_API_KEY = "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"
+OPENROUTER_API_KEY = ""
 
 def generate_ai_reply(messages: list) -> str:
     print(messages)
@@ -15,7 +15,7 @@ def generate_ai_reply(messages: list) -> str:
             "model": "mistralai/mistral-7b-instruct",  # free + good model
             "messages": messages
         }
-        ,verify=False
+        ,verify=certifi.where()
     )
 
     data = response.json()
