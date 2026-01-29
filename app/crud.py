@@ -13,5 +13,13 @@ def save_chat(db: Session, user_id: str, message: str, reply: str):
     print(chat)
     return chat
 
+def get_recent_chats(db: Session,user_id:str, limit: int = 10):
+    return (
+        db.query(ChatHistory)
+        .filter(ChatHistory.user_id == user_id)
+        .order_by(ChatHistory.id.desc())
+        .limit(limit)
+        .all()
+    )
 def get_chat_history(db: Session, user_id: str):
     return db.query(ChatHistory).filter(ChatHistory.user_id == user_id).all()

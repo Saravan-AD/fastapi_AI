@@ -4,6 +4,8 @@ from app.schemas import ChatRequest, ChatResponse
 from app.database import SessionLocal, engine, Base
 from sqlalchemy.orm import Session
 
+from app.services.ai_service import generate_ai_reply
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -23,16 +25,28 @@ def get_db():
 @app.post("/chat", response_model=ChatResponse)
 def chat(request: ChatRequest, db:Session=Depends(get_db)):
     
-    reply_text= f"Hello {request.user_id}, you said: {request.message}"
+    previous_chats=crud.get_recent_chats(db=db, user_id=request.user_id)
+
+    messages = [
+        {"role": "system", "content": "You are a helpful support assistant."}
+    ]
+
+    for chat in reversed(previous_chats):
+        messages.append({"role": "user", "content": chat.message})
+        messages.append({"role": "assistant", "content": chat.reply})
+
+    messages.append({"role": "user", "content": request.message})
+
+    ai_reply = generate_ai_reply(messages)
 
     crud.save_chat(
         db=db,
         user_id=request.user_id,
         message=request.message,
-        reply=reply_text
+        reply=ai_reply
     )
     return ChatResponse(
-        reply=f"Hello {request.user_id}, you said: {request.message}"
+        reply=ai_reply
     )
 
 @app.get("/history/{user_id}")
