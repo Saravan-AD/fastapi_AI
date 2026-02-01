@@ -1,7 +1,7 @@
 import requests
 import certifi
 
-OPENROUTER_API_KEY = ""
+OPENROUTER_API_KEY = "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"
 
 def generate_ai_reply(messages: list) -> str:
     print(messages)
