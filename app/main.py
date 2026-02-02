@@ -6,11 +6,19 @@ from sqlalchemy.orm import Session
 import os
 from app.services.ai_service import generate_ai_reply
 from app.services.doc_service import load_all_documents
-
+from fastapi.middleware.cors import CORSMiddleware
 
 Base.metadata.create_all(bind=engine)
 
 app = FastAPI(title="Smart AI Assistant")
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 @app.get("/")
 def root():
