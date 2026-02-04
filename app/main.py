@@ -5,7 +5,7 @@ from app.database import SessionLocal, engine, Base
 from sqlalchemy.orm import Session
 import os
 from app.services.ai_service import generate_ai_reply
-from app.services.doc_service import load_all_documents
+from app.services.doc_service import find_relevant_chunks, load_and_chunk_documents
 from fastapi.middleware.cors import CORSMiddleware
 
 Base.metadata.create_all(bind=engine)
@@ -73,17 +73,38 @@ def upload_doc(file: UploadFile = File(...)):
     return {"message": "File uploaded successfully"}
 
 @app.post("/ask-doc", response_model=ChatResponse)
-def ask_doc(request: ChatRequest):
+def ask_doc(request: ChatRequest,db:Session=Depends(get_db)):
 
-    documents_text = load_all_documents()
+    chunks = load_and_chunk_documents()
+    print(chunks)
+    relevant_chunks = find_relevant_chunks(request.message, chunks)
+    print(relevant_chunks)
+    context = "\n\n".join(relevant_chunks)
+
+    previous_chats=crud.get_recent_chats(db=db, user_id=request.user_id)
 
     messages = [
-        {"role": "system", "content": "Answer ONLY using the provided documents. If not found, say you don't know."},
-        {"role": "user", "content": f"DOCUMENTS:\n{documents_text}"},
-        {"role": "user", "content": request.message}
+        {"role": "system", "content": "Answer ONLY using the provided context. If not found, say you don't know."}
     ]
 
+    for chat in reversed(previous_chats):
+        messages.append({"role": "user", "content": chat.message})
+        messages.append({"role": "assistant", "content": chat.reply})
+
+    messages.extend([
+        {"role": "user", "content": f"CONTEXT:\n{context}"},
+        {"role": "user", "content": request.message}
+    ])
+    print(messages)
     ai_reply = generate_ai_reply(messages)
+
+    if not ai_reply.startswith("(AI Error)"):
+        crud.save_chat(
+        db=db,
+        user_id=request.user_id,
+        message=request.message,
+        reply=ai_reply
+        )
 
     return ChatResponse(reply=ai_reply)
 
