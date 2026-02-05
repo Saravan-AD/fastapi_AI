@@ -5,8 +5,11 @@ from app.database import SessionLocal, engine, Base
 from sqlalchemy.orm import Session
 import os
 from app.services.ai_service import generate_ai_reply
-from app.services.doc_service import find_relevant_chunks, load_and_chunk_documents
+from app.services.doc_service import find_relevant_chunks, load_and_chunk_documents, retrieve_chunks
 from fastapi.middleware.cors import CORSMiddleware
+from app.services.doc_service import initialize_doc_system, rebuild_index
+
+
 
 Base.metadata.create_all(bind=engine)
 
@@ -19,6 +22,10 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+@app.on_event("startup")
+def startup_event():
+    initialize_doc_system()   # Loads existing documents when server starts
 
 @app.get("/")
 def root():
@@ -70,16 +77,16 @@ def upload_doc(file: UploadFile = File(...)):
     with open(file_path, "wb") as f:
         f.write(file.file.read())
 
+    rebuild_index()
+
     return {"message": "File uploaded successfully"}
 
 @app.post("/ask-doc", response_model=ChatResponse)
 def ask_doc(request: ChatRequest,db:Session=Depends(get_db)):
 
-    chunks = load_and_chunk_documents()
-    print(chunks)
-    relevant_chunks = find_relevant_chunks(request.message, chunks)
-    print(relevant_chunks)
-    context = "\n\n".join(relevant_chunks)
+    chunks = retrieve_chunks(request.message)
+    context = "\n\n".join([c["text"] for c in chunks])
+
 
     previous_chats=crud.get_recent_chats(db=db, user_id=request.user_id)
 
@@ -95,7 +102,7 @@ def ask_doc(request: ChatRequest,db:Session=Depends(get_db)):
         {"role": "user", "content": f"CONTEXT:\n{context}"},
         {"role": "user", "content": request.message}
     ])
-    print(messages)
+    # print(messages)
     ai_reply = generate_ai_reply(messages)
 
     if not ai_reply.startswith("(AI Error)"):

@@ -8,7 +8,7 @@ load_dotenv()
 OPENROUTER_API_KEY = os.getenv("API_KEY")
 
 def generate_ai_reply(messages: list) -> str:
-    print(messages)
+    # print(messages)
     response = requests.post(
         "https://openrouter.ai/api/v1/chat/completions",
         headers={
@@ -23,7 +23,7 @@ def generate_ai_reply(messages: list) -> str:
     )
 
     data = response.json()
-    print("AI RAW RESPONSE:", data)  # 👈 VERY IMPORTANT FOR DEBUGGING
+    # print("AI RAW RESPONSE:", data)  # 👈 VERY IMPORTANT FOR DEBUGGING
 
     # ✅ If API returned an error
     if "error" in data:
